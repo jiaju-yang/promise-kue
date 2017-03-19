@@ -1,49 +1,47 @@
-const promiseKue = require('..')
-
-function randomGenerator () {
-  return (new Date()).getMilliseconds() * 1000 + Math.floor(Math.random() * 1000)
-}
+const {createQueue, Task} = require('..')
 
 function asynchronousFunc (millisecond) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     console.log(millisecond)
     setTimeout(() => {
+      if (millisecond === 5000) {
+        return reject(Math.floor(Math.random() * 100))
+      }
       resolve(Math.floor(Math.random() * 100))
     }, millisecond)
   })
 }
 
-const queue = promiseKue.createQueue(3, 1000)
+const queue = createQueue(3, 1000)
 
-const id1 = randomGenerator()
 const tasks1 = [
-  {method: asynchronousFunc, args: [1000]},
-  {method: asynchronousFunc, args: [1000]},
-  {method: asynchronousFunc, args: [2000]},
-  {method: asynchronousFunc, args: [2000]},
-  {method: asynchronousFunc, args: [3000]},
-  {method: asynchronousFunc, args: [3000]},
-  {method: asynchronousFunc, args: [3000]}
+  // {method: asynchronousFunc, args: [1000]},
+  new Task(asynchronousFunc, [1000]),
+  new Task(asynchronousFunc, [1000]),
+  new Task(asynchronousFunc, [2000]),
+  new Task(asynchronousFunc, [2000]),
+  new Task(asynchronousFunc, [3000]),
+  new Task(asynchronousFunc, [3000]),
+  new Task(asynchronousFunc, [3000])
 ]
 
-const id2 = randomGenerator()
 const tasks2 = [
-  {method: asynchronousFunc, args: [5000]},
-  {method: asynchronousFunc, args: [5000]},
-  {method: asynchronousFunc, args: [6000]},
-  {method: asynchronousFunc, args: [6000]},
-  {method: asynchronousFunc, args: [4000]},
-  {method: asynchronousFunc, args: [4000]},
-  {method: asynchronousFunc, args: [4000]}
+  new Task(asynchronousFunc, [5000]),
+  new Task(asynchronousFunc, [5000]),
+  new Task(asynchronousFunc, [6000]),
+  new Task(asynchronousFunc, [6000]),
+  new Task(asynchronousFunc, [4000]),
+  new Task(asynchronousFunc, [4000]),
+  new Task(asynchronousFunc, [4000])
 ]
 
-queue.on(id1, result => {
+queue.on(queue.push(tasks1), (err, result) => {
+  console.log(err)
   console.log(result)
 })
 
-queue.on(id2, result => {
+queue.on(queue.push(tasks2), (err, result) => {
+  console.log(err)
   console.log(result)
 })
 
-queue.push(id1, tasks1)
-queue.push(id2, tasks2)

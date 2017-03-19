@@ -1,34 +1,44 @@
-const EventEmitter = require('events')
-class EventBus extends EventEmitter {
-}
+const Task = require('./lib/Task')
+const EventBus = require('./lib/EventBus')
+const randomNumberGenerator = require('./lib/ranadomNumberGenerator')
 
-function createQueue (limit, max) {
+function createQueue (limit, max = 2000) {
+  const generate = randomNumberGenerator()
   let active = 0
   const bus = new EventBus()
   const queue = []
   const results = {}
 
-  bus.push = function (taskId, tasks) {
-    if (!Array.isArray(tasks)) {
-      throw new Error('What is this?')
-    }
-    if (queue.length + tasks.length > max) {
-      throw new Error('I am overloaded.')
-    }
-    results[taskId] = {
-      taskCount: tasks.length,
-      executed: []
-    }
-    tasks.forEach(task => {
-      const waitingTask = {
-        id: taskId,
-        execution: function () {
-          return task.method(...task.args)
+  function push (task) {
+    return addTask(Array.isArray(task) ? task : [task], queue.push)
+  }
+
+  function head (task) {
+    return addTask(Array.isArray(task) ? task : [task], queue.unshift)
+  }
+
+  function addTask (tasks, fn) {
+    const id = generate()
+    checkTasksAllRight(tasks)
+    setTimeout(() => {
+      if (queue.length + tasks.length > max) {
+        return sendError(id, new Error('I am overloaded.'))
+      }
+      results[id] = {
+        taskCount: tasks.length,
+        executed: {
+          success: [],
+          failure: []
         }
       }
-      queue.push(waitingTask)
-    })
-    next()
+      const queueFn = fn.bind(queue)
+      tasks.forEach(task => {
+        task.id = id
+        queueFn(task)
+      })
+      next()
+    }, 100)
+    return id
   }
 
   function next () {
@@ -39,28 +49,52 @@ function createQueue (limit, max) {
     active++
     task.execution()
       .then(result => {
-        const {taskCount, executed} = results[task.id]
-        executed.push(result)
-        if (taskCount === executed.length) {
-          bus.emit('sameIdTasksFinished', task.id)
-        }
-        active--
-        bus.emit('taskFinished')
+        handleResult(task.id, result, results[task.id].executed.success)
+      })
+      .catch(err => {
+        handleResult(task.id, err, results[task.id].executed.failure)
       })
     next()
   }
 
-  bus.on('sameIdTasksFinished', id => {
+  function checkTasksAllRight (tasks) {
+    for (let i = 0; i < tasks.length; i++) {
+      if (!(tasks[i] instanceof Task)) {
+        throw new Error(`I don't know what this is. But it's definitely not a task.`)
+      }
+    }
+  }
+
+  function handleResult (id, result, resultCollector) {
+    const {taskCount, executed} = results[id]
+    resultCollector.push(result)
+    if (taskCount === executed.success.length + executed.failure.length) {
+      sameIdTasksFinished(id)
+    }
+    active--
+    next()
+  }
+
+  function sameIdTasksFinished (id) {
     const taskResults = results[id]
     delete results[id]
-    bus.emit(id, taskResults.executed)
-  })
+    bus.emit(id, null, taskResults.executed)
+  }
 
-  bus.on('taskFinished', () => {
-    next()
-  })
+  function sendError (id, err) {
+    if (results[id]) {
+      delete results[id]
+    }
+    bus.emit(id, err)
+  }
 
-  return bus
+  return {
+    push: push,
+    head: head,
+    on: function (type, listener) {
+      bus.once(type, listener)
+    }
+  }
 }
 
-module.exports = {createQueue: createQueue}
+module.exports = {createQueue: createQueue, Task: Task}
