@@ -45,3 +45,8 @@ queue.on(queue.push(tasks2), (err, result) => {
   console.log(result)
 })
 
+queue.on(queue.head(new Task(asynchronousFunc, [500])), (err, result) => {
+  console.log(err)
+  console.log(result)
+})
+
