@@ -37,7 +37,7 @@ function createQueue (limit, max = 2000) {
         queueFn(task)
       })
       next()
-    }, 100)
+    }, 0)
     return id
   }
 
